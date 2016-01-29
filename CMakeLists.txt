@@ -17,8 +17,8 @@ FIND_PACKAGE(MRPT REQUIRED base gui opengl slam maps obs)
 		
 ADD_EXECUTABLE(Difodo-Multi-Datasets  
 	main_Difodo_multi_datasets.cpp
-	difodo_multi_datasets.cpp
-	difodo_multi_datasets.h
+	Difodo_multi_datasets.cpp
+	Difodo_multi_datasets.h
 	CDifodo_multi.h
 	CDifodo_multi.cpp
 	)
