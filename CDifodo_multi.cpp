@@ -579,7 +579,6 @@ void CDifodo::calculateDepthDerivatives()
 
 void CDifodo::computeWeights()
 {
-#if EIGEN_VERSION_AT_LEAST(3,1,0)  // Eigen 3.1.0 needed for Matrix::log()
 	for (unsigned int c=0; c<NC; c++)
 	{
 		weights[c].resize(rows_i, cols_i);
@@ -636,10 +635,6 @@ void CDifodo::computeWeights()
 	const float inv_max = 1.f/max_weight;
 	for (unsigned int c=0; c<NC; c++)
 		weights[c] *= inv_max;
-
-#else
-	THROW_EXCEPTION("This class requires Eigen 3.1.0 or above!")
-#endif
 }
 
 void CDifodo::solveOneLevel()
@@ -718,57 +713,56 @@ void CDifodo::odometryCalculation()
 	if (fast_pyramid)	buildCoordinatesPyramidFast();
 	else				buildCoordinatesPyramid();
 
-	//Coarse-to-fines scheme
+    //Coarse-to-fines scheme
     for (unsigned int i=0; i<ctf_levels; i++)
     {
-		//Previous computations
-		global_trans[i].setIdentity();
-		for (unsigned int c=0; c<NC; c++)
-			transformations[c][i].setIdentity();
+        //Previous computations
+        global_trans[i].setIdentity();
+        for (unsigned int c=0; c<NC; c++)
+            transformations[c][i].setIdentity();
 
-		level = i;
-		unsigned int s = pow(2.f,int(ctf_levels-(i+1)));
+        level = i;
+        unsigned int s = pow(2.f,int(ctf_levels-(i+1)));
         cols_i = cols/s; rows_i = rows/s;
         image_level = ctf_levels - i + round(log(float(width/cols))/log(2.f)) - 1;
 
-		//1. Perform warping
-		if (i == 0)
-			for (unsigned int c=0; c<NC; c++)
-			{
-				depth_warped[c][image_level] = depth[c][image_level];
-				xx_warped[c][image_level] = xx[c][image_level];
-				yy_warped[c][image_level] = yy[c][image_level];
-			}
-		else
-			performWarping();
+        //1. Perform warping
+        if (i == 0)
+            for (unsigned int c=0; c<NC; c++)
+            {
+                depth_warped[c][image_level] = depth[c][image_level];
+                xx_warped[c][image_level] = xx[c][image_level];
+                yy_warped[c][image_level] = yy[c][image_level];
+            }
+        else
+            performWarping();
 
-		//2. Calculate inter coords and find null measurements
-		calculateCoord();
+        //2. Calculate inter coords and find null measurements
+        calculateCoord();
 
-		//3. Compute derivatives
-		calculateDepthDerivatives();
+        //3. Compute derivatives
+        calculateDepthDerivatives();
 
-		//4. Compute weights
-		computeWeights();
+        //4. Compute weights
+        computeWeights();
 
-		//5. Solve odometry
-		if (num_valid_points > 6)
-			solveOneLevel();
+        //5. Solve odometry
+        if (num_valid_points > 6)
+            solveOneLevel();
 
-		//6. Filter solution
-		filterLevelSolution();
-	}
+        //6. Filter solution
+        filterLevelSolution();
+    }
 
-	//Update poses
-	poseUpdate();
+    //Update poses
+    poseUpdate();
 
-	//Save runtime
-	execution_time = 1000.f*clock.Tac();   
+    //Save runtime
+    execution_time = 1000.f*clock.Tac();
 }
 
 void CDifodo::filterLevelSolution()
-{
-#if EIGEN_VERSION_AT_LEAST(3,1,0)  // Eigen 3.1.0 needed for Matrix::log()
+{  
 	//		Calculate Eigenvalues and Eigenvectors
 	//----------------------------------------------------------
 	SelfAdjointEigenSolver<MatrixXf> eigensolver(est_cov);
@@ -795,9 +789,18 @@ void CDifodo::filterLevelSolution()
 	for (unsigned int i=0; i<level; i++)
 		acu_trans = global_trans[i]*acu_trans;
 
-	Matrix<float, 4, 4> log_trans = acu_trans.log();
-	kai_loc_sub(0) -= log_trans(0,3); kai_loc_sub(1) -= log_trans(1,3); kai_loc_sub(2) -= log_trans(2,3);
-	kai_loc_sub(3) += log_trans(1,2); kai_loc_sub(4) -= log_trans(0,2); kai_loc_sub(5) += log_trans(0,1);
+    Matrix<float, 4, 4> log_trans;
+#if EIGEN_VERSION_AT_LEAST(3,1,0)  // Eigen 3.1.0 needed for Matrix::log()
+    log_trans = acu_trans.log();
+#else
+    //Alternative to compute the logarithm of the matrix
+    Matrix<float,4,4> aux;
+    aux = acu_trans - MatrixXf::Identity(4,4);
+    log_trans = aux - 0.5f*aux*aux + 0.33333f*aux*aux*aux - 0.25f*aux*aux*aux*aux + 0.2f*aux*aux*aux*aux*aux;
+#endif
+    kai_loc_sub(0) -= log_trans(0,3); kai_loc_sub(1) -= log_trans(1,3); kai_loc_sub(2) -= log_trans(2,3);
+    kai_loc_sub(3) += log_trans(1,2); kai_loc_sub(4) -= log_trans(0,2); kai_loc_sub(5) += log_trans(0,1);
+
 
 	//Transform that local representation to the "eigenvector" basis
 	Matrix<float,6,1> kai_b_old;
@@ -838,15 +841,10 @@ void CDifodo::filterLevelSolution()
 		local_mat(2,3) = v_local(2);
 		global_trans[level] = local_mat.exp();
 	}
-
-#else
-	THROW_EXCEPTION("This class requires Eigen 3.1.0 or above!")
-#endif
 }
 
 void CDifodo::poseUpdate()
 {
-#if EIGEN_VERSION_AT_LEAST(3,1,0)  // Eigen 3.1.0 needed for Matrix::log()
 	//First, compute the overall transformation
 	//---------------------------------------------------
 	Matrix4f acu_trans;
@@ -857,14 +855,22 @@ void CDifodo::poseUpdate()
 
 	//Compute the new estimates in the local and absolutes reference frames
 	//---------------------------------------------------------------------
-	Matrix4f log_trans = acu_trans.log();
+    Matrix<float, 4, 4> log_trans;
+#if EIGEN_VERSION_AT_LEAST(3,1,0)  // Eigen 3.1.0 needed for Matrix::log()
+    log_trans = acu_trans.log();
+#else
+    //Alternative to compute the logarithm of the matrix
+    Matrix<float,4,4> aux;
+    aux = acu_trans - MatrixXf::Identity(4,4);
+    log_trans = aux - 0.5f*aux*aux + 0.33333f*aux*aux*aux - 0.25f*aux*aux*aux*aux + 0.2f*aux*aux*aux*aux*aux;
+#endif
 	kai_loc(0) = log_trans(0,3); kai_loc(1) = log_trans(1,3); kai_loc(2) = log_trans(2,3);
 	kai_loc(3) = -log_trans(1,2); kai_loc(4) = log_trans(0,2); kai_loc(5) = -log_trans(0,1);
 
 	CMatrixDouble33 inv_trans;
 	CMatrixFloat31 v_abs, w_abs;
 
-	cam_pose.getRotationMatrix(inv_trans);
+    global_pose.getRotationMatrix(inv_trans);
 	v_abs = inv_trans.cast<float>()*kai_loc.topRows(3);
 	w_abs = inv_trans.cast<float>()*kai_loc.bottomRows(3);
 	kai_abs.topRows<3>() = v_abs;
@@ -873,20 +879,17 @@ void CDifodo::poseUpdate()
 
 	//						Update poses
 	//-------------------------------------------------------	
-	cam_oldpose = cam_pose;
+    global_oldpose = global_pose;
 	CMatrixDouble44 aux_acu = acu_trans;
 	poses::CPose3D pose_aux(aux_acu);
-	cam_pose = cam_pose + pose_aux;
+    global_pose = global_pose + pose_aux;
 
 
 	//Compute the velocity estimate in the new ref frame (to be used by the filter in the next iteration)
 	//---------------------------------------------------------------------------------------------------
-	cam_pose.getRotationMatrix(inv_trans);
+    global_pose.getRotationMatrix(inv_trans);
 	kai_loc_old.topRows<3>() = inv_trans.inverse().cast<float>()*kai_abs.topRows(3);
 	kai_loc_old.bottomRows<3>() = inv_trans.inverse().cast<float>()*kai_abs.bottomRows(3);
-#else
-	THROW_EXCEPTION("This class requires Eigen 3.1.0 or above!")
-#endif
 }
 
 

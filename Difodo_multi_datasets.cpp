@@ -44,15 +44,16 @@ void CDifodoDatasets::loadConfiguration(const utils::CConfigFileBase &ini )
 	cols = ini.read_int("DIFODO_CONFIG", "cols", 320, true);
 	ctf_levels = ini.read_int("DIFODO_CONFIG", "ctf_levels", 5, true);
 	string filename = ini.read_string("DIFODO_CONFIG", "filename", "no file", true);
+    fast_pyramid = true;
 
     //				Load cameras' extrinsic calibrations
     //==================================================================
 
-    CPose3D sensorPoseWRTRobot[4];
+    int cams_order[4] = {1,4,3,2};
 
     for ( int c = 1; c <= NC; c++ )
     {
-        string sensorLabel = mrpt::format("RGBD_%i",c);
+        string sensorLabel = mrpt::format("RGBD_%i",cams_order[c-1]);
 
         double x       = ini.read_double(sensorLabel,"x",0,true);
         double y       = ini.read_double(sensorLabel,"y",0,true);
@@ -61,9 +62,9 @@ void CDifodoDatasets::loadConfiguration(const utils::CConfigFileBase &ini )
         double pitch   = DEG2RAD(ini.read_double(sensorLabel,"pitch",0,true));
         double roll    = DEG2RAD(ini.read_double(sensorLabel,"roll",0,true));
 
-        sensorPoseWRTRobot[c-1].setFromValues(x,y,z,yaw,pitch,roll);
+        cam_pose[c-1].setFromValues(x,y,z,yaw,pitch,roll);
         CMatrixDouble44 homoMatrix;
-        sensorPoseWRTRobot[c-1].getHomogeneousMatrix(homoMatrix);
+        cam_pose[c-1].getHomogeneousMatrix(homoMatrix);
         calib_mat[c-1] = (CMatrixFloat44)homoMatrix;
     }
 
@@ -194,37 +195,28 @@ void CDifodoDatasets::initializeScene()
 	//					Cameras and points
 	//------------------------------------------------------
 
-	//DifOdo camera
-	CBoxPtr camera_odo = CBox::Create(math::TPoint3D(-0.02,-0.1,-0.01),math::TPoint3D(0.02,0.1,0.01));
-	camera_odo->setPose(cam_pose + rel_lenspose);
-	camera_odo->setColor(0,1,0);
-	scene->insert( camera_odo );
+    //Cameras
+    for (unsigned int c=0; c<NC; c++)
+    {
+        CBoxPtr camera_odo = CBox::Create(math::TPoint3D(-0.02,-0.1,-0.01),math::TPoint3D(0.02,0.1,0.01));
+        camera_odo->setPose(cam_pose[c] + rel_lenspose);
+        camera_odo->setColor(0,1,0);
+        scene->insert( camera_odo );
 
-	//Groundtruth camera
-	CBoxPtr camera_gt = CBox::Create(math::TPoint3D(-0.02,-0.1,-0.01),math::TPoint3D(0.02,0.1,0.01));
-	camera_gt->setPose(gt_pose + rel_lenspose);
-	camera_gt->setColor(1,0,0);
-	scene->insert( camera_gt );
+        //Frustum
+        opengl::CFrustumPtr FOV = opengl::CFrustum::Create(0.3, 2, 57.3*fovh, 57.3*fovv, 1.f, true, false);
+        FOV->setColor(0.7,0.7,0.7);
+        FOV->setPose(cam_pose[c]);
+        scene->insert( FOV );
 
-	//Frustum
-	opengl::CFrustumPtr FOV = opengl::CFrustum::Create(0.3, 2, 57.3*fovh, 57.3*fovv, 1.f, true, false);
-	FOV->setColor(0.7,0.7,0.7);
-	FOV->setPose(gt_pose);
-	scene->insert( FOV );
-
-	//Reference gt
-	CSetOfObjectsPtr reference_gt = stock_objects::CornerXYZ();
-	reference_gt->setScale(0.2);
-	reference_gt->setPose(gt_pose);
-	scene->insert( reference_gt );
-
-	//Camera points
-	CPointCloudColouredPtr cam_points = CPointCloudColoured::Create();
-	cam_points->setColor(1,0,0);
-	cam_points->setPointSize(2);
-	cam_points->enablePointSmooth(1);
-	cam_points->setPose(cam_pose);
-	scene->insert( cam_points );
+        //Camera points
+        CPointCloudColouredPtr cam_points = CPointCloudColoured::Create();
+        cam_points->setColor(1,0,0);
+        cam_points->setPointSize(2);
+        cam_points->enablePointSmooth(1);
+        cam_points->setPose(cam_pose[c]);
+        scene->insert( cam_points );
+    }
 
 
 	//					Trajectories and covariance
@@ -242,18 +234,6 @@ void CDifodoDatasets::initializeScene()
 	traj_points_odo->enablePointSmooth(1);
 	scene->insert( traj_points_odo );
 
-	//Groundtruth
-	CSetOfLinesPtr traj_lines_gt = CSetOfLines::Create();
-	traj_lines_gt->setLocation(0,0,0);
-	traj_lines_gt->setColor(0.6,0,0);
-	traj_lines_gt->setLineWidth(6);
-	scene->insert( traj_lines_gt );
-	CPointCloudPtr traj_points_gt = CPointCloud::Create();
-	traj_points_gt->setColor(0.6,0,0);
-	traj_points_gt->setPointSize(4);
-	traj_points_gt->enablePointSmooth(1);
-	scene->insert( traj_points_gt );
-
 	//Ellipsoid showing covariance
 	math::CMatrixFloat33 cov3d = 20.f*est_cov.topLeftCorner(3,3);
 	CEllipsoidPtr ellip = CEllipsoid::Create();
@@ -261,7 +241,7 @@ void CDifodoDatasets::initializeScene()
 	ellip->setQuantiles(2.0);
 	ellip->setColor(1.0, 1.0, 1.0, 0.5);
 	ellip->enableDrawSolid3D(true);
-	ellip->setPose(cam_pose + rel_lenspose);
+    ellip->setPose(global_pose);
 	scene->insert( ellip );
 
 	//User-interface information
@@ -279,57 +259,52 @@ void CDifodoDatasets::updateScene()
 {
 	CPose3D rel_lenspose(0,-0.022,0,0,0,0);
 	
+    printf("\n rows, cols = %d, %d", rows, cols);
+
 	scene = window.get3DSceneAndLock();
 
 	//Reference gt
-	CSetOfObjectsPtr reference_gt = scene->getByClass<CSetOfObjects>(0);
-	reference_gt->setPose(gt_pose);
+//	CSetOfObjectsPtr reference_gt = scene->getByClass<CSetOfObjects>(0);
+//	reference_gt->setPose(gt_pose);
 
 	//Camera points
-	CPointCloudColouredPtr cam_points = scene->getByClass<CPointCloudColoured>(0);
-	cam_points->clear();
-	cam_points->setPose(gt_pose);
-	//for (unsigned int y=0; y<cols; y++)
-	//	for (unsigned int z=0; z<rows; z++)
-	//		cam_points->push_back(depth[repr_level](z,y), xx[repr_level](z,y), yy[repr_level](z,y),
-	//								1.f-sqrt(weights(z,y)), sqrt(weights(z,y)), 0);
+    for (unsigned int c=0; c<NC; c++)
+    {
+        CPointCloudColouredPtr cam_points = scene->getByClass<CPointCloudColoured>(c);
+        cam_points->clear();
+        cam_points->setPose(global_pose + cam_pose[c]);
 
-	//DifOdo camera
-	CBoxPtr camera_odo = scene->getByClass<CBox>(0);
-	camera_odo->setPose(cam_pose + rel_lenspose);
+        for (unsigned int y=0; y<cols; y++)
+            for (unsigned int z=0; z<rows; z++)
+                cam_points->push_back(depth[c][repr_level](z,y), xx[c][repr_level](z,y), yy[c][repr_level](z,y),
+//                                      0.f, 0.f, 1.f);
+                                        1.f-sqrt(weights[c](z,y)), sqrt(weights[c](z,y)), 0);
 
-	//Groundtruth camera
-	CBoxPtr camera_gt = scene->getByClass<CBox>(1);
-	camera_gt->setPose(gt_pose + rel_lenspose);
+        //DifOdo camera
+        CBoxPtr camera_odo = scene->getByClass<CBox>(c);
+        camera_odo->setPose(global_pose + cam_pose[c] + rel_lenspose);
 
-	//Frustum
-	CFrustumPtr FOV = scene->getByClass<CFrustum>(0);
-	FOV->setPose(gt_pose);
+        //Frustum
+        CFrustumPtr FOV = scene->getByClass<CFrustum>(c);
+        FOV->setPose(global_pose + cam_pose[c]);
+    }
 
-	if ((first_pose == true)&&((gt_pose-gt_oldpose).norm() < 0.5))
-	{
-		//Difodo traj lines
-		CSetOfLinesPtr traj_lines_odo = scene->getByClass<CSetOfLines>(0);
-		traj_lines_odo->appendLine(cam_oldpose.x(), cam_oldpose.y(), cam_oldpose.z(), cam_pose.x(), cam_pose.y(), cam_pose.z());
+    if ((first_pose == true))
+    {
+        //Difodo traj lines
+        CSetOfLinesPtr traj_lines_odo = scene->getByClass<CSetOfLines>(0);
+        traj_lines_odo->appendLine(global_oldpose.x(), global_oldpose.y(), global_oldpose.z(), global_pose.x(), global_pose.y(), global_pose.z());
 
-		//Difodo traj points
-		CPointCloudPtr traj_points_odo = scene->getByClass<CPointCloud>(0);
-		traj_points_odo->insertPoint(cam_pose.x(), cam_pose.y(), cam_pose.z());
+        //Difodo traj points
+        CPointCloudPtr traj_points_odo = scene->getByClass<CPointCloud>(0);
+        traj_points_odo->insertPoint(global_pose.x(), global_pose.y(), global_pose.z());
+    }
 
-		//Groundtruth traj lines
-		CSetOfLinesPtr traj_lines_gt = scene->getByClass<CSetOfLines>(1);
-		traj_lines_gt->appendLine(gt_oldpose.x(), gt_oldpose.y(), gt_oldpose.z(), gt_pose.x(), gt_pose.y(), gt_pose.z());
-
-		//Groundtruth traj points
-		CPointCloudPtr traj_points_gt = scene->getByClass<CPointCloud>(1);
-		traj_points_gt->insertPoint(gt_pose.x(), gt_pose.y(), gt_pose.z());
-	}
-
-	//Ellipsoid showing covariance
-	math::CMatrixFloat33 cov3d = 20.f*est_cov.topLeftCorner(3,3);
-	CEllipsoidPtr ellip = scene->getByClass<CEllipsoid>(0);
-	ellip->setCovMatrix(cov3d);
-	ellip->setPose(cam_pose + rel_lenspose);
+    //Ellipsoid showing covariance
+    math::CMatrixFloat33 cov3d = 20.f*est_cov.topLeftCorner(3,3);
+    CEllipsoidPtr ellip = scene->getByClass<CEllipsoid>(0);
+    ellip->setCovMatrix(cov3d);
+    ellip->setPose(global_pose + rel_lenspose);
 
 	window.unlockAccess3DScene();
 	window.repaint();
@@ -337,164 +312,41 @@ void CDifodoDatasets::updateScene()
 
 void CDifodoDatasets::loadFrame()
 {
-	CObservationPtr alfa = dataset.getAsObservation(rawlog_count);
+    for (unsigned int c=0; c<NC; c++)
+    {
+        CObservationPtr alfa = dataset.getAsObservation(rawlog_count);
 
-	while (!IS_CLASS(alfa, CObservation3DRangeScan))
-	{
-		rawlog_count++;
-		if (dataset.size() <= rawlog_count)
-		{
-			dataset_finished = true;
-			return;
-		}
-		alfa = dataset.getAsObservation(rawlog_count);
-	}
+        while (!IS_CLASS(alfa, CObservation3DRangeScan))
+        {
+            rawlog_count++;
+            if (dataset.size() <= rawlog_count)
+            {
+                dataset_finished = true;
+                return;
+            }
+            alfa = dataset.getAsObservation(rawlog_count);
+        }
 
-	CObservation3DRangeScanPtr obs3D = CObservation3DRangeScanPtr(alfa);
-	obs3D->load();
-	const CMatrix range = obs3D->rangeImage;
-	const unsigned int height = range.getRowCount();
-	const unsigned int width = range.getColCount();
+        CObservation3DRangeScanPtr obs3D = CObservation3DRangeScanPtr(alfa);
+        obs3D->load();
+        const CMatrix range = obs3D->rangeImage;
+        const unsigned int height = range.getRowCount();
+        const unsigned int width = range.getColCount();
 
-	//for (unsigned int j = 0; j<cols; j++)
-	//	for (unsigned int i = 0; i<rows; i++)
-	//	{
-	//		const float z = range(height-downsample*i-1, width-downsample*j-1);
-	//		if (z < 4.5f)	depth_wf(i,j) = z;
-	//		else			depth_wf(i, j) = 0.f;
-	//	}
+        for (unsigned int j = 0; j<cols; j++)
+            for (unsigned int i = 0; i<rows; i++)
+            {
+                const float z = range(height-downsample*i-1, width-downsample*j-1);
+                if (z < 4.5f)	depth_wf[c](i,j) = z;
+                else			depth_wf[c](i,j) = 0.f;
+            }
 
+        obs3D->unload();
+        rawlog_count++;
 
-	double timestamp_gt;
-	timestamp_obs = mrpt::system::timestampTotime_t(obs3D->timestamp);
-
-	//Exit if there is no groundtruth at this time
-	if (last_groundtruth > timestamp_obs)
-	{
-		groundtruth_ok = 0;
-		obs3D->unload();
-		rawlog_count++;
-		return;
-	}
-
-	//Search the corresponding groundtruth data and interpolate
-	bool new_data = 0;
-	last_groundtruth_ok = groundtruth_ok;
-	while (last_groundtruth < timestamp_obs - 0.01)
-	{
-		f_gt.ignore(100,'\n');
-		f_gt >> timestamp_gt;
-		last_groundtruth = timestamp_gt;
-		new_data = 1;
-
-		if (f_gt.eof())
-		{
-			dataset_finished = true;
-			return;
-		}
-	}
-
-	//Read the inmediatly previous groundtruth
-	double x0,y0,z0,qx0,qy0,qz0,w0,t0;
-	if (new_data == 1)
-	{
-		f_gt >> x0; f_gt >> y0; f_gt >> z0;
-		f_gt >> qx0; f_gt >> qy0; f_gt >> qz0; f_gt >> w0;
-	}
-	else
-	{
-		x0 = last_gt_data[0]; y0 = last_gt_data[1]; z0 = last_gt_data[2];
-		qx0 = last_gt_data[3]; qy0 = last_gt_data[4]; qz0 = last_gt_data[5]; w0 = last_gt_data[6];
-	}
-
-	t0 = last_groundtruth;
-
-	//Read the inmediatly posterior groundtruth
-	f_gt.ignore(10,'\n');
-	f_gt >> timestamp_gt;
-	if (f_gt.eof())
-	{
-		dataset_finished = true;
-		return;
-	}
-	last_groundtruth = timestamp_gt;
-
-	//last_gt_data = [x y z qx qy qz w]
-	f_gt >> last_gt_data[0]; f_gt >> last_gt_data[1]; f_gt >> last_gt_data[2];
-	f_gt >> last_gt_data[3]; f_gt >> last_gt_data[4]; f_gt >> last_gt_data[5]; f_gt >> last_gt_data[6];
-
-	if (last_groundtruth - timestamp_obs > 0.01)
-		groundtruth_ok = 0;
-
-	else
-	{
-		gt_oldpose = gt_pose;
-
-		//							Update pose
-		//-----------------------------------------------------------------
-		const float incr_t0 = timestamp_obs - t0;
-		const float incr_t1 = last_groundtruth - timestamp_obs;
-		const float incr_t = incr_t0 + incr_t1;
-
-		if (incr_t == 0.f) //Deal with defects in the groundtruth files
-		{
-			groundtruth_ok = 0;
-			return;
-		}
-
-		//Sometimes the quaternion sign changes in the groundtruth
-		if (abs(qx0 + last_gt_data[3]) + abs(qy0 + last_gt_data[4]) + abs(qz0 + last_gt_data[5]) + abs(w0 + last_gt_data[6]) < 0.05)
-		{
-			qx0 = -qx0; qy0 = -qy0; qz0 = -qz0; w0 = -w0;
-		}
-
-		double x,y,z,qx,qy,qz,w;
-		x = (incr_t0*last_gt_data[0] + incr_t1*x0)/(incr_t);
-		y = (incr_t0*last_gt_data[1] + incr_t1*y0)/(incr_t);
-		z = (incr_t0*last_gt_data[2] + incr_t1*z0)/(incr_t);
-		qx = (incr_t0*last_gt_data[3] + incr_t1*qx0)/(incr_t);
-		qy = (incr_t0*last_gt_data[4] + incr_t1*qy0)/(incr_t);
-		qz = (incr_t0*last_gt_data[5] + incr_t1*qz0)/(incr_t);
-		w = (incr_t0*last_gt_data[6] + incr_t1*w0)/(incr_t);
-
-		CMatrixDouble33 mat;
-		mat(0,0) = 1- 2*qy*qy - 2*qz*qz;
-		mat(0,1) = 2*(qx*qy - w*qz);
-		mat(0,2) = 2*(qx*qz + w*qy);
-		mat(1,0) = 2*(qx*qy + w*qz);
-		mat(1,1) = 1 - 2*qx*qx - 2*qz*qz;
-		mat(1,2) = 2*(qy*qz - w*qx);
-		mat(2,0) = 2*(qx*qz - w*qy);
-		mat(2,1) = 2*(qy*qz + w*qx);
-		mat(2,2) = 1 - 2*qx*qx - 2*qy*qy;
-
-		CPose3D gt, transf;
-		gt.setFromValues(x,y,z,0,0,0);
-		gt.setRotationMatrix(mat);
-		transf.setFromValues(0,0,0,0.5*M_PI, -0.5*M_PI, 0);
-
-		//Alternative - directly quaternions
-		//vector<float> quat;
-		//quat[0] = x, quat[1] = y; quat[2] = z;
-		//quat[3] = w, quat[4] = qx; quat[5] = qy; quat[6] = qz;
-		//gt.setFromXYZQ(quat);
-
-		//Set the initial pose (if appropiate)
-		if (first_pose == false)
-		{
-			cam_pose = gt + transf;
-			first_pose = true;
-		}
-
-		gt_pose = gt + transf;
-		groundtruth_ok = 1;
-	}
-
-	obs3D->unload();
-	rawlog_count++;
-
-	if (dataset.size() <= rawlog_count)
-		dataset_finished = true;
+        if (dataset.size() <= rawlog_count)
+            dataset_finished = true;
+    }
 }
 
 void CDifodoDatasets::reset()
@@ -503,8 +355,7 @@ void CDifodoDatasets::reset()
 	if (fast_pyramid)	buildCoordinatesPyramidFast();
 	else				buildCoordinatesPyramid();
 
-	cam_oldpose = cam_pose;
-	gt_oldpose = gt_pose;
+    global_oldpose = global_pose;
 }
 
 void CDifodoDatasets::writeTrajectoryFile()

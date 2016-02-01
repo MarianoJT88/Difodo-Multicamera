@@ -20,9 +20,6 @@
 class CDifodoDatasets : public CDifodo {
 public:
 
-	mrpt::poses::CPose3D gt_pose;		//!< Groundtruth camera pose
-	mrpt::poses::CPose3D gt_oldpose;	//!< Groundtruth camera previous pose
-
 	mrpt::opengl::COpenGLScenePtr scene;	//!< Opengl scene
 	mrpt::gui::CDisplayWindow3D	window;
 	mrpt::obs::CRawlog	dataset;
@@ -69,14 +66,4 @@ public:
 	  *
 	  * Please visit http://vision.in.tum.de/data/datasets/rgbd-dataset/file_formats for further details.*/  
 	void writeTrajectoryFile();
-
-private:
-
-	// Used to interpolate grountruth poses
-	bool groundtruth_ok;
-	bool last_groundtruth_ok;
-
-	double last_groundtruth;	//!< Timestamp of the last groundtruth read
-	double timestamp_obs;		//!< Timestamp of the last observation
-	double last_gt_data[7];		//!< Last ground truth read (x y z qx qy qz w)
 };

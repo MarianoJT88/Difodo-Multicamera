@@ -16,7 +16,7 @@ cols = 320
 ctf_levels = 5 
 
 ;Absolute path of the rawlog file 
-filename = ...sample_multiRGBD.rawlog
+filename = ...sample_multipleRGBD.rawlog
 
 ;Pose of the different devices w.r.t. the robot
 [RGBD_1]

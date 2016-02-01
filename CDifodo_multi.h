@@ -184,8 +184,10 @@ public:
 	float execution_time;
 
 	/** Camera poses */
-	mrpt::poses::CPose3D cam_pose;		//!< Last camera pose
-	mrpt::poses::CPose3D cam_oldpose;	//!< Previous camera pose
+    mrpt::poses::CPose3D cam_pose[NC];		//!< Last camera pose
+    mrpt::poses::CPose3D cam_oldpose[NC];	//!< Previous camera pose
+    mrpt::poses::CPose3D global_pose;
+    mrpt::poses::CPose3D global_oldpose;
 
 	/** This method performs all the necessary steps to estimate the camera velocity once the new image is read,
 		and updates the camera pose */
