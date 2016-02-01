@@ -7,10 +7,14 @@
    | Released under BSD License. See details in http://www.mrpt.org/License    |
    +---------------------------------------------------------------------------+ */
 
-#include <mrpt/utils/types_math.h> // Eigen
+//#include <mrpt/utils/types_math.h> // Eigen
 #include <mrpt/math/CMatrixFixedNumeric.h>
 #include <mrpt/poses/CPose3D.h>
 #include <unsupported/Eigen/MatrixFunctions>
+#include <Eigen/Dense>
+
+#define NC 4
+#define NL 6
 
 
 /** This abstract class implements a method called "Difodo" to perform Visual odometry with range cameras.
@@ -49,32 +53,35 @@ class CDifodo {
 protected:
 
 	/** Matrix that stores the original depth frames with the image resolution */
-	Eigen::MatrixXf depth_wf;
+	Eigen::MatrixXf depth_wf[NC];
 
 	/** Matrices that store the point coordinates after downsampling. */
-	std::vector<Eigen::MatrixXf> depth;
-	std::vector<Eigen::MatrixXf> depth_old;
-	std::vector<Eigen::MatrixXf> depth_inter;
-	std::vector<Eigen::MatrixXf> depth_warped;
-	std::vector<Eigen::MatrixXf> xx;
-	std::vector<Eigen::MatrixXf> xx_inter;
-	std::vector<Eigen::MatrixXf> xx_old;
-	std::vector<Eigen::MatrixXf> xx_warped;
-	std::vector<Eigen::MatrixXf> yy;
-	std::vector<Eigen::MatrixXf> yy_inter;
-	std::vector<Eigen::MatrixXf> yy_old;
-	std::vector<Eigen::MatrixXf> yy_warped;
+	Eigen::MatrixXf depth[NC][NL];
+	Eigen::MatrixXf depth_old[NC][NL];
+	Eigen::MatrixXf depth_inter[NC][NL];
+	Eigen::MatrixXf depth_warped[NC][NL];
+	Eigen::MatrixXf zz_global[NC][NL];
+	Eigen::MatrixXf xx[NC][NL];
+	Eigen::MatrixXf xx_inter[NC][NL];
+	Eigen::MatrixXf xx_old[NC][NL];
+	Eigen::MatrixXf xx_warped[NC][NL];
+	Eigen::MatrixXf xx_global[NC][NL];
+	Eigen::MatrixXf yy[NC][NL];
+	Eigen::MatrixXf yy_inter[NC][NL];
+	Eigen::MatrixXf yy_old[NC][NL];
+	Eigen::MatrixXf yy_warped[NC][NL];
+	Eigen::MatrixXf yy_global[NC][NL];
 
 	/** Matrices that store the depth derivatives */
-	Eigen::MatrixXf du;
-	Eigen::MatrixXf dv;
-	Eigen::MatrixXf dt;
+	Eigen::MatrixXf du[NC];
+	Eigen::MatrixXf dv[NC];
+	Eigen::MatrixXf dt[NC];
 
 	/** Weights for the range flow constraint equations in the least square solution */
-	Eigen::MatrixXf weights;
+	Eigen::MatrixXf weights[NC];
 
 	/** Matrix which indicates whether the depth of a pixel is zero (null = 1) or not (null = 00).*/
-	Eigen::Matrix<bool, Eigen::Dynamic, Eigen::Dynamic> null;
+	Eigen::Matrix<bool, Eigen::Dynamic, Eigen::Dynamic> null[NC];
 
 	/** Least squares covariance matrix */
 	Eigen::Matrix<float, 6, 6> est_cov;
@@ -116,8 +123,13 @@ protected:
 	float previous_speed_const_weight;	//!<Default 0.05
 	float previous_speed_eig_weight;	//!<Default 0.5
 
-	/** Transformations of the coarse-to-fine levels */
-	std::vector<Eigen::MatrixXf> transformations;
+	/** Calibration matrices */
+	Eigen::Matrix4f calib_mat[NC];	 // This transforms points/vectors from global to local
+	Eigen::Matrix3f rot_cam_mat[NC]; // I am not sure if I will need them **********************************
+	
+	/** Transformations of the coarse-to-fine levels */		//Re-adjust the sizes of the transformations!! Now one for each camera
+	MatrixXf transformations[NC][NL];
+	MatrixXf global_trans[NL];
 			
 	/** Solution from the solver at a given level */
 	Eigen::Matrix<float, 6, 1> kai_loc_level;
@@ -157,9 +169,6 @@ protected:
 
 
 public:
-
-	/** Frames per second (Hz) */
-	float fps;
 
 	/** Resolution of the images taken by the range camera */
 	unsigned int cam_mode;	// (1 - 640 x 480, 2 - 320 x 240, 4 - 160 x 120)
@@ -207,12 +216,6 @@ public:
 	/** Set the filter eigen-weight of the velocity filter. */
 	inline void setSpeedFilterEigWeight(float new_eweight) { previous_speed_eig_weight = new_eweight;}
 
-	/** Get the coordinates of the points considered by the visual odometry method */
-	inline void getPointsCoord(Eigen::MatrixXf &x, Eigen::MatrixXf &y, Eigen::MatrixXf &z);
-
-	/** Get the depth derivatives (last level) respect to u,v and t respectively */
-	inline void getDepthDerivatives(Eigen::MatrixXf &cur_du, Eigen::MatrixXf &cur_dv, Eigen::MatrixXf &cur_dt);
-
 	/** Get the camera velocity (vx, vy, vz, wx, wy, wz) expressed in local reference frame estimated by the solver (before filtering) */
 	inline mrpt::math::CMatrixFloat61 getSolverSolution() const {return kai_loc_level;}
 
@@ -221,9 +224,6 @@ public:
 
 	/** Get the least-square covariance matrix */
 	inline mrpt::math::CMatrixFloat66 getCovariance() const {return est_cov;}
-
-	/** Get the matrix of weights */
-	inline void getWeights(Eigen::MatrixXf &we);
 
 	/** Virtual method to be implemented in derived classes.
 		* It should be used to load a new depth image into the variable depth_wf */
