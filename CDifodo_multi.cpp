@@ -650,7 +650,7 @@ void CDifodo::solveOneLevel()
 
 	for (unsigned int c=0; c<NC; c++)
 	{
-		Eigen::Matrix3f calib_rot = calib_mat[NC].block<3,3>(0,0).transpose();
+		Eigen::Matrix3f calib_rot = calib_mat[c].block<3,3>(0,0).transpose();
 
 		for (unsigned int u = 1; u < cols_i-1; u++)
 			for (unsigned int v = 1; v < rows_i-1; v++)
@@ -826,20 +826,28 @@ void CDifodo::filterLevelSolution()
 	local_mat(2,3) = kai_loc_fil(2);
 	global_trans[level] = local_mat.exp();
 
-	//Compute the rigid transformations associated to the local coordinate systems of each camera
+	//Compute the rigid transformations associated to the local coordinate systems of each camera - ********** The problem is here! ****************
 	//-------------------------------------------------------------------------------------------
 	for (unsigned int c=0; c<NC; c++)
 	{
-		const Vector3f v_local = calib_mat[c].block<3,3>(0,0)*kai_loc_fil.topRows(3);
+		cout << endl << "Calib matrix: " << endl << calib_mat[c];
+		cout << endl << "Calib matrix inv: " << endl << calib_mat[c].inverse();
+
+		const Vector4f old_cam_location = calib_mat[c].inverse().col(3);
+		const Vector4f new_cam_location = global_trans[level].inverse()*old_cam_location;	//with or without inverse! Cuidado con cuál eje es cuál!!
+		const Vector3f v_local = -calib_mat[c].block<3,3>(0,0)*(new_cam_location - old_cam_location).topRows(3);
+		
+		//const Vector3f v_local = calib_mat[c].block<3,3>(0,0)*kai_loc_fil.topRows(3);
 		const Vector3f w_local = calib_mat[c].block<3,3>(0,0)*kai_loc_fil.bottomRows(3);
 
+		local_mat.assign(0.f);
 		local_mat(0,1) = -w_local(2); local_mat(1,0) = w_local(2);
 		local_mat(0,2) = w_local(1); local_mat(2,0) = -w_local(1);
 		local_mat(1,2) = -w_local(0); local_mat(2,1) = w_local(0);
 		local_mat(0,3) = v_local(0);
 		local_mat(1,3) = v_local(1);
 		local_mat(2,3) = v_local(2);
-		global_trans[level] = local_mat.exp();
+		transformations[c][level] = local_mat.exp();
 	}
 }
 

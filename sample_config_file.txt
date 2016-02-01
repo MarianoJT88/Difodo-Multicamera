@@ -8,12 +8,12 @@
 
 cam_mode = 2 - 640x480, 2 - 320x240, 4 - 160x120 
 ;downsample: 1 - 640x480, 2 - 320x240, 4 - 160x120 
-downsample = 1 
+downsample = 2 
 
 ;Indicate the number of rows and columns. They must be equal or inferior to what is indicated with the 'downsample' variable). 
-rows = 240 
-cols = 320 
-ctf_levels = 5 
+rows = 120 
+cols = 160 
+ctf_levels = 1 
 
 ;Absolute path of the rawlog file 
 filename = ...sample_multipleRGBD.rawlog

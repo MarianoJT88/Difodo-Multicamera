@@ -13,7 +13,7 @@
 #include <unsupported/Eigen/MatrixFunctions>
 #include <Eigen/Dense>
 
-#define NC 4 // Number of cameras
+#define NC 1 // Number of cameras
 #define NL 6 // Number of coarse-to-fine levels
 
 

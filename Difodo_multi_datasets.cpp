@@ -65,7 +65,8 @@ void CDifodoDatasets::loadConfiguration(const utils::CConfigFileBase &ini )
         cam_pose[c-1].setFromValues(x,y,z,yaw,pitch,roll);
         CMatrixDouble44 homoMatrix;
         cam_pose[c-1].getHomogeneousMatrix(homoMatrix);
-        calib_mat[c-1] = (CMatrixFloat44)homoMatrix;
+        calib_mat[c-1] = (CMatrixFloat44)homoMatrix.inverse();
+
     }
 
 	//						Open Rawlog File
@@ -189,8 +190,8 @@ void CDifodoDatasets::initializeScene()
 	scene->insert( ground );
 
 	//Reference
-	//CSetOfObjectsPtr reference = stock_objects::CornerXYZ();
-	//scene->insert( reference );
+	CSetOfObjectsPtr reference = stock_objects::CornerXYZ();
+	scene->insert( reference );
 
 	//					Cameras and points
 	//------------------------------------------------------
@@ -264,8 +265,8 @@ void CDifodoDatasets::updateScene()
 	scene = window.get3DSceneAndLock();
 
 	//Reference gt
-//	CSetOfObjectsPtr reference_gt = scene->getByClass<CSetOfObjects>(0);
-//	reference_gt->setPose(gt_pose);
+	CSetOfObjectsPtr reference_gt = scene->getByClass<CSetOfObjects>(0);
+	reference_gt->setPose(global_pose);
 
 	//Camera points
     for (unsigned int c=0; c<NC; c++)
@@ -289,16 +290,13 @@ void CDifodoDatasets::updateScene()
         FOV->setPose(global_pose + cam_pose[c]);
     }
 
-    if ((first_pose == true))
-    {
-        //Difodo traj lines
-        CSetOfLinesPtr traj_lines_odo = scene->getByClass<CSetOfLines>(0);
-        traj_lines_odo->appendLine(global_oldpose.x(), global_oldpose.y(), global_oldpose.z(), global_pose.x(), global_pose.y(), global_pose.z());
+    //Difodo traj lines
+    CSetOfLinesPtr traj_lines_odo = scene->getByClass<CSetOfLines>(0);
+    traj_lines_odo->appendLine(global_oldpose.x(), global_oldpose.y(), global_oldpose.z(), global_pose.x(), global_pose.y(), global_pose.z());
 
-        //Difodo traj points
-        CPointCloudPtr traj_points_odo = scene->getByClass<CPointCloud>(0);
-        traj_points_odo->insertPoint(global_pose.x(), global_pose.y(), global_pose.z());
-    }
+    //Difodo traj points
+    CPointCloudPtr traj_points_odo = scene->getByClass<CPointCloud>(0);
+    traj_points_odo->insertPoint(global_pose.x(), global_pose.y(), global_pose.z());
 
     //Ellipsoid showing covariance
     math::CMatrixFloat33 cov3d = 20.f*est_cov.topLeftCorner(3,3);
@@ -342,7 +340,7 @@ void CDifodoDatasets::loadFrame()
             }
 
         obs3D->unload();
-        rawlog_count++;
+        rawlog_count += 4; //rawlog_count++;*******************************************
 
         if (dataset.size() <= rawlog_count)
             dataset_finished = true;
