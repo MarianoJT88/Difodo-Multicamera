@@ -45,6 +45,28 @@ void CDifodoDatasets::loadConfiguration(const utils::CConfigFileBase &ini )
 	ctf_levels = ini.read_int("DIFODO_CONFIG", "ctf_levels", 5, true);
 	string filename = ini.read_string("DIFODO_CONFIG", "filename", "no file", true);
 
+    //				Load cameras' extrinsic calibrations
+    //==================================================================
+
+    CPose3D sensorPoseWRTRobot[4];
+
+    for ( int c = 1; c <= NC; c++ )
+    {
+        string sensorLabel = mrpt::format("RGBD_%i",c);
+
+        double x       = ini.read_double(sensorLabel,"x",0,true);
+        double y       = ini.read_double(sensorLabel,"y",0,true);
+        double z       = ini.read_double(sensorLabel,"z",0,true);
+        double yaw     = DEG2RAD(ini.read_double(sensorLabel,"yaw",0,true));
+        double pitch   = DEG2RAD(ini.read_double(sensorLabel,"pitch",0,true));
+        double roll    = DEG2RAD(ini.read_double(sensorLabel,"roll",0,true));
+
+        sensorPoseWRTRobot[c-1].setFromValues(x,y,z,yaw,pitch,roll);
+        CMatrixDouble44 homoMatrix;
+        sensorPoseWRTRobot[c-1].getHomogeneousMatrix(homoMatrix);
+        calib_mat[c-1] = (CMatrixFloat44)homoMatrix;
+    }
+
 	//						Open Rawlog File
 	//==================================================================
 	if (!dataset.loadFromRawLogFile(filename))

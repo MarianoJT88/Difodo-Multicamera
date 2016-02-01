@@ -15,7 +15,7 @@ using namespace mrpt;
 
 const char *default_cfg_txt =
 	"; ---------------------------------------------------------------\n"
-	"; FILE: Difodo Parameters.txt\n"
+    "; FILE: Difodo_multi Parameters.txt\n"
 	";\n"
 	";  MJT @ JANUARY-2015\n"
 	"; ---------------------------------------------------------------\n\n"
@@ -32,8 +32,14 @@ const char *default_cfg_txt =
 	"ctf_levels = 5 \n\n"
 
 	";Absolute path of the rawlog file \n"
-	"filename = C:/Users/Mariano/Desktop/rawlog_rgbd_dataset_freiburg1_desk/rgbd_dataset_freiburg1_desk.rawlog \n";
-	//"filename = .../file.rawlog \n";
+    "filename = C:/Users/Mariano/Desktop/rawlog_rgbd_dataset_freiburg1_desk/rgbd_dataset_freiburg1_desk.rawlog \n"
+    "\n"
+    ";Pose of the different devices w.r.t. the robot \n"
+    "[RGBD_1] \n x = 0 \n y = 0 \n z = 0 \n yaw = 0 \n pitch = 0 \n roll = 0 \n"
+    "[RGBD_2] \n x = 0 \n y = 0 \n z = 0 \n yaw = 0 \n pitch = 0 \n roll = 0 \n"
+    "[RGBD_3] \n x = 0 \n y = 0 \n z = 0 \n yaw = 0 \n pitch = 0 \n roll = 0 \n"
+    "[RGBD_4] \n x = 0 \n y = 0 \n z = 0 \n yaw = 0 \n pitch = 0 \n roll = 0 \n";
+
 
 
 // ------------------------------------------------------

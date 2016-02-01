@@ -13,8 +13,8 @@
 #include <unsupported/Eigen/MatrixFunctions>
 #include <Eigen/Dense>
 
-#define NC 4
-#define NL 6
+#define NC 4 // Number of cameras
+#define NL 6 // Number of coarse-to-fine levels
 
 
 /** This abstract class implements a method called "Difodo" to perform Visual odometry with range cameras.
@@ -128,7 +128,7 @@ protected:
 	
 	/** Transformations of the coarse-to-fine levels */		//Re-adjust the sizes of the transformations!! Now one for each camera
 	Eigen::MatrixXf transformations[NC][NL];
-	Eigen::MatrixXf global_trans[NL];
+    Eigen::MatrixXf global_trans[NL];
 			
 	/** Solution from the solver at a given level */
 	Eigen::Matrix<float, 6, 1> kai_loc_level;
