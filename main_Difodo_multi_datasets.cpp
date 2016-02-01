@@ -35,10 +35,10 @@ const char *default_cfg_txt =
     "filename = C:/Users/Mariano/Desktop/rawlog_rgbd_dataset_freiburg1_desk/rgbd_dataset_freiburg1_desk.rawlog \n"
     "\n"
     ";Pose of the different devices w.r.t. the robot \n"
-    "[RGBD_1] \n x = 0 \n y = 0 \n z = 0 \n yaw = 0 \n pitch = 0 \n roll = 0 \n"
-    "[RGBD_2] \n x = 0 \n y = 0 \n z = 0 \n yaw = 0 \n pitch = 0 \n roll = 0 \n"
-    "[RGBD_3] \n x = 0 \n y = 0 \n z = 0 \n yaw = 0 \n pitch = 0 \n roll = 0 \n"
-    "[RGBD_4] \n x = 0 \n y = 0 \n z = 0 \n yaw = 0 \n pitch = 0 \n roll = 0 \n";
+    "[RGBD_1] \n x = 0 \n y = 0 \n z = 0 \n yaw = 0 \n pitch = 0 \n roll = 0 \n\n"
+    "[RGBD_2] \n x = 0 \n y = 0 \n z = 0 \n yaw = 0 \n pitch = 0 \n roll = 0 \n\n"
+    "[RGBD_3] \n x = 0 \n y = 0 \n z = 0 \n yaw = 0 \n pitch = 0 \n roll = 0 \n\n"
+    "[RGBD_4] \n x = 0 \n y = 0 \n z = 0 \n yaw = 0 \n pitch = 0 \n roll = 0 \n\n";
 
 
 
