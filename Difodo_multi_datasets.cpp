@@ -37,9 +37,9 @@ void CDifodoDatasets::loadConfiguration(const utils::CConfigFileBase &ini )
 {	
 	fovh = M_PI*62.5/180.0;	//Larger FOV because depth is registered with color
 	fovv = M_PI*48.5/180.0;
-	cam_mode = 1;
+    cam_mode = ini.read_int("DIFODO_CONFIG", "cam_mode", 2, true); // The resolution of the images within the rawlog (1:640x480, 2:320x240)
 	fast_pyramid = false;
-	downsample = ini.read_int("DIFODO_CONFIG", "downsample", 2, true);
+    downsample = ini.read_int("DIFODO_CONFIG", "downsample", 1, true);
 	rows = ini.read_int("DIFODO_CONFIG", "rows", 240, true);
 	cols = ini.read_int("DIFODO_CONFIG", "cols", 320, true);
 	ctf_levels = ini.read_int("DIFODO_CONFIG", "ctf_levels", 5, true);
@@ -55,24 +55,6 @@ void CDifodoDatasets::loadConfiguration(const utils::CConfigFileBase &ini )
 	// Set external images directory:
 	const string imgsPath = CRawlog::detectImagesDirectory(filename);
 	CImage::IMAGES_PATH_BASE = imgsPath;
-
-	//					Load ground-truth
-	//=========================================================
-	filename = system::extractFileDirectory(filename);
-	filename.append("/groundtruth.txt");
-	f_gt.open(filename.c_str());
-
-	if (f_gt.fail())
-		throw std::runtime_error("\nError finding the groundtruth file: it should be contained in the same folder than the rawlog file");
-
-	char aux[100];
-	f_gt.getline(aux, 100);
-	f_gt.getline(aux, 100);
-	f_gt.getline(aux, 100);
-	f_gt >> last_groundtruth;
-	f_gt >> last_gt_data[0]; f_gt >> last_gt_data[1]; f_gt >> last_gt_data[2];
-	f_gt >> last_gt_data[3]; f_gt >> last_gt_data[4]; f_gt >> last_gt_data[5]; f_gt >> last_gt_data[6];
-	last_groundtruth_ok = 1;
 
 	//			Resize matrices and adjust parameters
 	//=========================================================
