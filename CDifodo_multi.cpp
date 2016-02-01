@@ -655,9 +655,7 @@ void CDifodo::solveOneLevel()
 
 	for (unsigned int c=0; c<NC; c++)
 	{
-		Eigen::Matrix3f calib_rot = calib_mat[NC].block<3,3>(0,0);	//This or the transpose, I am not sure
-		//I also need to find the global coordinates of the points to put them into the rigid constraint (5) in TRO **********************
-		// and include them into the equations
+		Eigen::Matrix3f calib_rot = calib_mat[NC].block<3,3>(0,0).transpose();
 
 		for (unsigned int u = 1; u < cols_i-1; u++)
 			for (unsigned int v = 1; v < rows_i-1; v++)
@@ -671,10 +669,18 @@ void CDifodo::solveOneLevel()
 					const float dycomp = du[c](v,u)*f_inv*inv_d;
 					const float dzcomp = dv[c](v,u)*f_inv*inv_d;
 					const float tw = weights[c](v,u);
+					const float z_global = zz_global[c][image_level](v,u);
+					const float x_global = xx_global[c][image_level](v,u);
+					const float y_global = yy_global[c][image_level](v,u);
 
 					//Fill A and b
 					Eigen::Vector3f A_v_local; A_v_local << tw*(1.f + dycomp*x*inv_d + dzcomp*y*inv_d), tw*(-dycomp), tw*(-dzcomp);
-					Eigen::Vector3f A_w_local; A_w_local << tw*(dycomp*y - dzcomp*x), tw*(y + dycomp*inv_d*y*x + dzcomp*(y*y*inv_d + d)), tw*(-x - dycomp*(x*x*inv_d + d) - dzcomp*inv_d*y*x);
+					Eigen::Vector3f A_w_local; 
+					
+					
+					A_w_local << tw*(dycomp*y_global - dzcomp*x_global),
+								 tw*(y_global + dycomp*inv_d*y_global*x + dzcomp*(y*y_global*inv_d + z_global)),
+								 tw*(-x_global - dycomp*(x*x_global*inv_d + z_global) - dzcomp*inv_d*y*x_global);
 
 					A.block<1,3>(cont, 0) = (calib_rot*A_v_local).transpose();
 					A.block<1,3>(cont, 3) = (calib_rot*A_w_local).transpose();

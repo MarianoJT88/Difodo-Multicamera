@@ -125,7 +125,6 @@ protected:
 
 	/** Calibration matrices */
 	Eigen::Matrix4f calib_mat[NC];	 // This transforms points/vectors from global to local
-	Eigen::Matrix3f rot_cam_mat[NC]; // I am not sure if I will need them **********************************
 	
 	/** Transformations of the coarse-to-fine levels */		//Re-adjust the sizes of the transformations!! Now one for each camera
 	Eigen::MatrixXf transformations[NC][NL];
