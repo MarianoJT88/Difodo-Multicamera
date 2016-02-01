@@ -82,51 +82,51 @@ void CDifodoDatasets::loadConfiguration(const utils::CConfigFileBase &ini )
 
 	//Resize pyramid
     const unsigned int pyr_levels = round(log(float(width/cols))/log(2.f)) + ctf_levels;
-    depth.resize(pyr_levels);
-    depth_old.resize(pyr_levels);
-    depth_inter.resize(pyr_levels);
-	depth_warped.resize(pyr_levels);
-    xx.resize(pyr_levels);
-    xx_inter.resize(pyr_levels);
-    xx_old.resize(pyr_levels);
-	xx_warped.resize(pyr_levels);
-    yy.resize(pyr_levels);
-    yy_inter.resize(pyr_levels);
-    yy_old.resize(pyr_levels);
-	yy_warped.resize(pyr_levels);
-	transformations.resize(pyr_levels);
 
-	for (unsigned int i = 0; i<pyr_levels; i++)
-    {
-        unsigned int s = pow(2.f,int(i));
-        cols_i = width/s; rows_i = height/s;
-        depth[i].resize(rows_i, cols_i);
-        depth_inter[i].resize(rows_i, cols_i);
-        depth_old[i].resize(rows_i, cols_i);
-        depth[i].assign(0.0f);
-        depth_old[i].assign(0.0f);
-        xx[i].resize(rows_i, cols_i);
-        xx_inter[i].resize(rows_i, cols_i);
-        xx_old[i].resize(rows_i, cols_i);
-        xx[i].assign(0.0f);
-        xx_old[i].assign(0.0f);
-        yy[i].resize(rows_i, cols_i);
-        yy_inter[i].resize(rows_i, cols_i);
-        yy_old[i].resize(rows_i, cols_i);
-        yy[i].assign(0.0f);
-        yy_old[i].assign(0.0f);
-		transformations[i].resize(4,4);
-
-		if (cols_i <= cols)
+	for (unsigned int c=0; c<NC; c++)
+	{
+		for (unsigned int i = 0; i<pyr_levels; i++)
 		{
-			depth_warped[i].resize(rows_i,cols_i);
-			xx_warped[i].resize(rows_i,cols_i);
-			yy_warped[i].resize(rows_i,cols_i);
-		}
-    }
+			unsigned int s = pow(2.f,int(i));
+			cols_i = width/s; rows_i = height/s;
+			depth[c][i].resize(rows_i, cols_i);
+			depth_inter[c][i].resize(rows_i, cols_i);
+			depth_old[c][i].resize(rows_i, cols_i);
+			depth[c][i].assign(0.0f);
+			depth_old[c][i].assign(0.0f);
+			xx[c][i].resize(rows_i, cols_i);
+			xx_inter[c][i].resize(rows_i, cols_i);
+			xx_old[c][i].resize(rows_i, cols_i);
+			xx[c][i].assign(0.0f);
+			xx_old[c][i].assign(0.0f);
+			yy[c][i].resize(rows_i, cols_i);
+			yy_inter[c][i].resize(rows_i, cols_i);
+			yy_old[c][i].resize(rows_i, cols_i);
+			yy[c][i].assign(0.0f);
+			yy_old[c][i].assign(0.0f);
+			zz_global[c][i].resize(rows_i, cols_i);
+			xx_global[c][i].resize(rows_i, cols_i);
+			yy_global[c][i].resize(rows_i, cols_i);
 
-	//Resize matrix that store the original depth image
-	depth_wf.setSize(height,width);
+			if (cols_i <= cols)
+			{
+				depth_warped[c][i].resize(rows_i,cols_i);
+				xx_warped[c][i].resize(rows_i,cols_i);
+				yy_warped[c][i].resize(rows_i,cols_i);
+			}
+		}
+
+		//Resize matrix that store the original depth image
+		depth_wf[c].setSize(height,width);
+	}
+
+	//Resize the transformation matrices
+	for (unsigned int l = 0; l<pyr_levels; l++)
+		global_trans[l].resize(4,4);
+
+	for (unsigned int c=0; c<NC; c++)	
+		for (unsigned int l = 0; l<pyr_levels; l++)
+			transformations[c][l].resize(4,4);
 }
 
 void CDifodoDatasets::CreateResultsFile()
@@ -285,10 +285,10 @@ void CDifodoDatasets::updateScene()
 	CPointCloudColouredPtr cam_points = scene->getByClass<CPointCloudColoured>(0);
 	cam_points->clear();
 	cam_points->setPose(gt_pose);
-	for (unsigned int y=0; y<cols; y++)
-		for (unsigned int z=0; z<rows; z++)
-			cam_points->push_back(depth[repr_level](z,y), xx[repr_level](z,y), yy[repr_level](z,y),
-									1.f-sqrt(weights(z,y)), sqrt(weights(z,y)), 0);
+	//for (unsigned int y=0; y<cols; y++)
+	//	for (unsigned int z=0; z<rows; z++)
+	//		cam_points->push_back(depth[repr_level](z,y), xx[repr_level](z,y), yy[repr_level](z,y),
+	//								1.f-sqrt(weights(z,y)), sqrt(weights(z,y)), 0);
 
 	//DifOdo camera
 	CBoxPtr camera_odo = scene->getByClass<CBox>(0);
@@ -352,13 +352,13 @@ void CDifodoDatasets::loadFrame()
 	const unsigned int height = range.getRowCount();
 	const unsigned int width = range.getColCount();
 
-	for (unsigned int j = 0; j<cols; j++)
-		for (unsigned int i = 0; i<rows; i++)
-		{
-			const float z = range(height-downsample*i-1, width-downsample*j-1);
-			if (z < 4.5f)	depth_wf(i,j) = z;
-			else			depth_wf(i, j) = 0.f;
-		}
+	//for (unsigned int j = 0; j<cols; j++)
+	//	for (unsigned int i = 0; i<rows; i++)
+	//	{
+	//		const float z = range(height-downsample*i-1, width-downsample*j-1);
+	//		if (z < 4.5f)	depth_wf(i,j) = z;
+	//		else			depth_wf(i, j) = 0.f;
+	//	}
 
 
 	double timestamp_gt;
@@ -505,27 +505,27 @@ void CDifodoDatasets::reset()
 
 void CDifodoDatasets::writeTrajectoryFile()
 {	
-	//Don't take into account those iterations with consecutive equal depth images
-	if (abs(dt.sumAll()) > 0)
-	{		
-		mrpt::math::CQuaternionDouble quat;
-		CPose3D auxpose, transf;
-		transf.setFromValues(0,0,0,0.5*M_PI, -0.5*M_PI, 0);
+	////Don't take into account those iterations with consecutive equal depth images
+	//if (abs(dt.sumAll()) > 0)
+	//{		
+	//	mrpt::math::CQuaternionDouble quat;
+	//	CPose3D auxpose, transf;
+	//	transf.setFromValues(0,0,0,0.5*M_PI, -0.5*M_PI, 0);
 
-		auxpose = cam_pose - transf;
-		auxpose.getAsQuaternion(quat);
-	
-		char aux[24];
-		sprintf(aux,"%.04f", timestamp_obs);
-		f_res << aux << " ";
-		f_res << cam_pose[0] << " ";
-		f_res << cam_pose[1] << " ";
-		f_res << cam_pose[2] << " ";
-		f_res << quat(2) << " ";
-		f_res << quat(3) << " ";
-		f_res << -quat(1) << " ";
-		f_res << -quat(0) << endl;
-	}
+	//	auxpose = cam_pose - transf;
+	//	auxpose.getAsQuaternion(quat);
+	//
+	//	char aux[24];
+	//	sprintf(aux,"%.04f", timestamp_obs);
+	//	f_res << aux << " ";
+	//	f_res << cam_pose[0] << " ";
+	//	f_res << cam_pose[1] << " ";
+	//	f_res << cam_pose[2] << " ";
+	//	f_res << quat(2) << " ";
+	//	f_res << quat(3) << " ";
+	//	f_res << -quat(1) << " ";
+	//	f_res << -quat(0) << endl;
+	//}
 }
 
 

@@ -128,8 +128,8 @@ protected:
 	Eigen::Matrix3f rot_cam_mat[NC]; // I am not sure if I will need them **********************************
 	
 	/** Transformations of the coarse-to-fine levels */		//Re-adjust the sizes of the transformations!! Now one for each camera
-	MatrixXf transformations[NC][NL];
-	MatrixXf global_trans[NL];
+	Eigen::MatrixXf transformations[NC][NL];
+	Eigen::MatrixXf global_trans[NL];
 			
 	/** Solution from the solver at a given level */
 	Eigen::Matrix<float, 6, 1> kai_loc_level;
