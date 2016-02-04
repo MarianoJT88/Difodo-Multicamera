@@ -13,7 +13,7 @@
 #include <unsupported/Eigen/MatrixFunctions>
 #include <Eigen/Dense>
 
-#define NC 1 // Number of cameras
+#define NC 4 // Number of cameras
 #define NL 6 // Number of coarse-to-fine levels
 
 
@@ -126,7 +126,7 @@ protected:
 	/** Calibration matrices */
 	Eigen::Matrix4f calib_mat[NC];	 // This transforms points/vectors from global to local
 	
-	/** Transformations of the coarse-to-fine levels */		//Re-adjust the sizes of the transformations!! Now one for each camera
+	/** Transformations of the coarse-to-fine levels */
 	Eigen::MatrixXf transformations[NC][NL];
     Eigen::MatrixXf global_trans[NL];
 			
